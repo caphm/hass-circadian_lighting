@@ -366,7 +366,4 @@ class CircadianSwitch(SwitchEntity, RestoreEntity):
                 self.update_switch(self._initial_transition)
         except:
             pass
-<<<<<<< HEAD
-=======
 
->>>>>>> Add auto-disable when colortemp is set manually
