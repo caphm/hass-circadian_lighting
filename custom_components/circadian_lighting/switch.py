@@ -287,7 +287,7 @@ class CircadianSwitch(SwitchEntity, RestoreEntity):
             if transition == None:
                 transition = self._cl.data['transition']
 
-            brightness = self._attributes['brightness'] if not self.disable_brightness_adjust else None
+            brightness = self._attributes['brightness'] if not self._disable_brightness_adjust else None
             mired = int(self.calc_ct()) if self._lights_ct is not None else None
             rgb = tuple(map(int, self.calc_rgb())) if self._lights_rgb is not None else None
             xy = self.calc_xy() if self._lights_xy is not None else None
