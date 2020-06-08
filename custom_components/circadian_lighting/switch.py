@@ -43,7 +43,7 @@ CONF_DISABLE_BRIGHTNESS_ADJUST = 'disable_brightness_adjust'
 CONF_MIN_BRIGHT = 'min_brightness'
 DEFAULT_MIN_BRIGHT = 1
 CONF_MAX_BRIGHT = 'max_brightness'
-DEFAULT_MAX_BRIGHT = 100
+DEFAULT_MAX_BRIGHT = 255
 CONF_SLEEP_ENTITY = 'sleep_entity'
 CONF_SLEEP_STATE = 'sleep_state'
 CONF_SLEEP_CT = 'sleep_colortemp'
@@ -62,15 +62,15 @@ PLATFORM_SCHEMA = vol.Schema({
     vol.Optional(CONF_LIGHTS_BRIGHT): cv.entity_ids,
     vol.Optional(CONF_DISABLE_BRIGHTNESS_ADJUST, default=False): cv.boolean,
     vol.Optional(CONF_MIN_BRIGHT, default=DEFAULT_MIN_BRIGHT):
-        vol.All(vol.Coerce(int), vol.Range(min=1, max=100)),
+        vol.All(vol.Coerce(int), vol.Range(min=1, max=255)),
     vol.Optional(CONF_MAX_BRIGHT, default=DEFAULT_MAX_BRIGHT):
-        vol.All(vol.Coerce(int), vol.Range(min=1, max=100)),
+        vol.All(vol.Coerce(int), vol.Range(min=1, max=255)),
     vol.Optional(CONF_SLEEP_ENTITY): cv.entity_id,
     vol.Optional(CONF_SLEEP_STATE): cv.string,
     vol.Optional(CONF_SLEEP_CT):
         vol.All(vol.Coerce(int), vol.Range(min=1000, max=10000)),
     vol.Optional(CONF_SLEEP_BRIGHT):
-        vol.All(vol.Coerce(int), vol.Range(min=1, max=100)),
+        vol.All(vol.Coerce(int), vol.Range(min=1, max=255)),
     vol.Optional(CONF_DISABLE_ENTITY): cv.entity_id,
     vol.Optional(CONF_DISABLE_STATE): cv.string,
     vol.Optional(CONF_INITIAL_TRANSITION, default=DEFAULT_INITIAL_TRANSITION):
@@ -142,6 +142,11 @@ class CircadianSwitch(SwitchEntity, RestoreEntity):
         self._attributes = {}
         self._attributes['hs_color'] = self._hs_color
         self._attributes['brightness'] = None
+        self._attributes['kelvin'] = None
+        self._attributes['hs_color'] = None
+        self._attributes['xy_color'] = None
+        self._attributes['color_temp'] = None
+        self._attributes['rgb_color'] = None
 
         self._lights = []
         if lights_ct != None:
@@ -215,7 +220,6 @@ class CircadianSwitch(SwitchEntity, RestoreEntity):
         self.schedule_update_ha_state()
         self._hs_color = None
         self._attributes['hs_color'] = self._hs_color
-        self._attributes['brightness'] = None
 
     def is_sleep(self):
         return self._sleep_entity is not None and self.hass.states.get(self._sleep_entity).state == self._sleep_state
@@ -241,23 +245,24 @@ class CircadianSwitch(SwitchEntity, RestoreEntity):
         return color_xy_to_hs(*self.calc_xy())
 
     def calc_brightness(self):
-        if self._disable_brightness_adjust is True:
-            return None
+        if self.is_sleep():
+            _LOGGER.debug(self._name + " in Sleep mode")
+            return self._sleep_brightness
         else:
-            if self.is_sleep():
-                _LOGGER.debug(self._name + " in Sleep mode")
-                return self._sleep_brightness
+            if self._cl.data['percent'] > 0:
+                return self._max_brightness
             else:
-                if self._cl.data['percent'] > 0:
-                    return self._max_brightness
-                else:
-                    return ((self._max_brightness - self._min_brightness) * ((100+self._cl.data['percent']) / 100)) + self._min_brightness
+                return ((self._max_brightness - self._min_brightness) * ((100+self._cl.data['percent']) / 100)) + self._min_brightness
 
     def update_switch(self, transition=None):
         if self._cl.data is not None:
             self._hs_color = self.calc_hs()
-            self._attributes['hs_color'] = self._hs_color
+            self._attributes['kelvin'] = self._cl.data['colortemp']
             self._attributes['brightness'] = self.calc_brightness()
+            self._attributes['hs_color'] = self._hs_color
+            self._attributes['xy_color'] = self.calc_xy()
+            self._attributes['color_temp'] = self.calc_ct()
+            self._attributes['rgb_color'] = self.calc_rgb()
             _LOGGER.debug(self._name + " Switch Updated")
 
         self.adjust_lights(self._lights, transition)
@@ -280,7 +285,7 @@ class CircadianSwitch(SwitchEntity, RestoreEntity):
             if transition == None:
                 transition = self._cl.data['transition']
 
-            brightness = int((self._attributes['brightness'] / 100) * 254) if self._attributes['brightness'] is not None else None
+            brightness = self._attributes['brightness'] if not self.disable_brightness_adjust else None
             mired = int(self.calc_ct()) if self._lights_ct is not None else None
             rgb = tuple(map(int, self.calc_rgb())) if self._lights_rgb is not None else None
             xy = self.calc_xy() if self._lights_xy is not None else None
