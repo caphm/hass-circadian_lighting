@@ -23,6 +23,8 @@ try:
 except ImportError:
     from homeassistant.components.switch import SwitchDevice as SwitchEntity
  
+from homeassistant.components.switch import DOMAIN as SWITCH_DOMAIN
+
 from homeassistant.const import (
     ATTR_ENTITY_ID, CONF_NAME, CONF_PLATFORM, STATE_ON,
     SERVICE_TURN_ON)
@@ -349,7 +351,7 @@ class CircadianSwitch(SwitchEntity, RestoreEntity):
                 from_state.state == to_state.state == STATE_ON and
                 to_state.attributes['color_temp'] != color_temperature_kelvin_to_mired(self._cl.data['colortemp'])
             ):
-                self.hass.services.call(SWITCH_DOMAIN, SERVICE_TURN_OFF, {ATTR_ENTITY_ID: self.entity_id})
+                self.hass.services.call(SWITCH_DOMAIN, "turn_off", {ATTR_ENTITY_ID: self.entity_id})
                 _LOGGER.debug(self.entity_id + " turned off due to colortemp override by user")
             elif to_state.state == 'on' and from_state.state != 'on':
                 self.adjust_lights([entity_id], self._initial_transition)
